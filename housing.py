@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state='expanded'
 )
 
-# Custom CSS for better styling
+# Custom CSS for better styling (theme-aware)
 st.markdown("""
 <style>
     .main-header {
@@ -32,12 +32,12 @@ st.markdown("""
         margin-bottom: 2rem;
     }
     .metric-card {
-        background: white;
         padding: 1rem;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         border-left: 4px solid #667eea;
     }
+    /* Remove custom metric styling to allow Streamlit's theme handling */
+    /*
     .stMetric {
         background-color: #f8f9fa;
         border: 1px solid #e9ecef;
@@ -45,6 +45,7 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
+    */
 </style>
 """, unsafe_allow_html=True)
 
