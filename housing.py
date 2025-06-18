@@ -144,9 +144,6 @@ def calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refi
         if total_available_payment <= interest_to_pay:
             # If payment doesn't cover interest, we can only pay what we have
             ton_to_pay = 0
-            # In this case, the loan will never be paid off - need higher payments
-            if period > 1200:  # Safety check: break after 100 years
-                break
         else:
             # Normal case: payment covers interest plus some principal
             principal_available = total_available_payment - interest_to_pay
