@@ -110,53 +110,52 @@ st.markdown("---")
 
 # Loan Calculation
 @st.cache_data
-def calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refinance_cycle_years=0, raise_after_refinance=0):
-    left = debt
-    ton = [debt]
-    dok = [debt * interest * 31/365]
-    paid = [0]
-    monthly_payments = [monthly_payment]
-    years = [2026]
-    months = [1]
-    period = 1
-    year = 2026
-    month = 1
-    raise_ = 0
+def calculate_loan_schedule(start_year, start_month, debt, interest_pct, monthly_payment, yearly_add_on):
+    year = start_year
+    month = start_month
+    left_principal_balance = debt
+    period = 0
 
-    while left > 0:
+    starting_principal_balances = []
+    remaining_principal_balances = []
+    principal_payments = []
+    interest_payments = []
+    total_payments = []
+    add_ons = []
+    years = []
+    months = []
+
+    while left_principal_balance > 0:
+        starting_principal_balances.append(left_principal_balance)
+        
+        period += 1
+        
         # Interest for this period
         days_in_month = calendar.monthrange(year, month)[1]
-        interest_to_pay = left * interest * days_in_month / 365
+        interest_payment = left_principal_balance * interest_pct * days_in_month / 365
 
         # Year-end additional payment
+        add_on = 0
         if period % 12 == 0:
             add_on = yearly_add_on
-        else:
-            add_on = 0
-        
-        # Refinance and payment structure change every x years
-        if refinance_cycle_years > 0 and period % (12 * refinance_cycle_years) == 0:
-            raise_ += raise_after_refinance
+        add_ons.append(add_on)
         
         # Principal payment for this period
+        total_available_payment = monthly_payment + add_ons[-1]
+        principal_available = total_available_payment - interest_payment
+        
         # Ensure we have enough payment to cover interest, otherwise set principal payment to 0
-        total_available_payment = monthly_payment + add_on + raise_
-        if total_available_payment <= interest_to_pay:
-            # If payment doesn't cover interest, we can only pay what we have
-            ton_to_pay = 0
+        if total_available_payment <= interest_payment:
+            # If payment doesn't cover interest, we can only pay what we have towards interest
+            principal_payment = 0
+            # In this case, the loan balance will actually increase due to unpaid interest
+            # This is a realistic scenario for insufficient payments
         else:
             # Normal case: payment covers interest plus some principal
-            principal_available = total_available_payment - interest_to_pay
-            ton_to_pay = min(left, principal_available)
+            principal_payment = min(left_principal_balance, principal_available)
 
         # Remaining principal
-        left -= ton_to_pay
-        
-        # Safety check to prevent infinite loops
-        if period > 1200:  # 100 years maximum
-            break
-
-        period += 1
+        left_principal_balance -= principal_payment #+ interest_payment
         
         if month == 12:
             month = 1
@@ -164,18 +163,24 @@ def calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refi
         else:
             month += 1
         
-        ton.append(left)
-        paid.append(ton_to_pay)
-        dok.append(interest_to_pay)
-        monthly_payments.append(monthly_payment + raise_)
+        remaining_principal_balances.append(left_principal_balance)
+        principal_payments.append(principal_payment)
+        interest_payments.append(interest_payment)
+        total_payments.append(principal_payment + interest_payment + add_on)
         years.append(year)
         months.append(month)
+        
+        # Check if remaining balance is decreasing
+        if len(remaining_principal_balances) > 1 and remaining_principal_balances[-1] > remaining_principal_balances[-2]:
+            raise Exception("Remaining balance is not decreasing, something is wrong")
 
     df = pd.DataFrame({
-        'remaining_balance': ton,
-        'principal_payment': paid,
-        'interest_payment': dok,
-        'monthly_payment': monthly_payments,
+        'starting_principal_balance': starting_principal_balances,
+        'principal_payment': principal_payments,
+        'interest_payment': interest_payments,
+        'total_payment': total_payments,
+        'add_on': add_ons,
+        'remaining_principal_balance': remaining_principal_balances,
         'year': years,
         'month': months
     })
@@ -192,7 +197,15 @@ def calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refi
 
 # Calculate loan schedule
 with st.spinner('Calculating loan schedule...'):
-    df = calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refinance_cycle_years, raise_after_refinance)
+    # df = calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refinance_cycle_years, raise_after_refinance)
+    df = calculate_loan_schedule(
+        start_year=DEFAULT_START_YEAR, 
+        start_month=DEFAULT_START_MONTH, 
+        debt=debt, 
+        interest_pct=interest, 
+        monthly_payment=monthly_payment, 
+        yearly_add_on=yearly_add_on
+    )
 
 # Calculate summary statistics
 total_months = len(df) - 1
@@ -224,9 +237,9 @@ tab1, tab2, tab3, tab4 = st.tabs(["🏠 Balance Over Time", "💰 Payment Breakd
 
 with tab1:
     st.markdown("### Remaining Balance Over Time")
-    fig_balance = px.line(df[1:], x='date', y='remaining_balance', 
+    fig_balance = px.line(df[1:], x='date', y='remaining_principal_balance', 
                          title="Remaining Loan Balance Over Time",
-                         labels={'remaining_balance': 'Remaining Balance (฿)', 'date': 'Date'})
+                         labels={'remaining_principal_balance': 'Remaining Balance (฿)', 'date': 'Date'})
     fig_balance.update_layout(height=500)
     fig_balance.update_traces(line_color='#667eea', line_width=3)
     st.plotly_chart(fig_balance, use_container_width=True)
@@ -294,11 +307,11 @@ with tab4:
     # display_df = df[1:61].copy()
     display_df = df.copy()
     display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
-    display_df = display_df[['date', 'remaining_balance', 'principal_payment', 'interest_payment', 'total_payment']]
-    display_df.columns = ['Date', 'Remaining Balance (฿)', 'Principal (฿)', 'Interest (฿)', 'Total Payment (฿)']
+    display_df = display_df[['date', 'starting_principal_balance', 'principal_payment', 'interest_payment', 'total_payment', 'add_on', 'remaining_principal_balance']]
+    display_df.columns = ['Date', 'Starting Balance (฿)', 'Principal (฿)', 'Interest (฿)', 'Total Payment (฿)', 'Add-on (฿)', 'Remaining Balance (฿)']
     
     # Format numbers
-    for col in ['Remaining Balance (฿)', 'Principal (฿)', 'Interest (฿)', 'Total Payment (฿)']:
+    for col in ['Starting Balance (฿)', 'Principal (฿)', 'Interest (฿)', 'Total Payment (฿)', 'Add-on (฿)', 'Remaining Balance (฿)']:
         display_df[col] = display_df[col].apply(lambda x: f"฿{x:,.0f}")
     
     st.dataframe(display_df, use_container_width=True, height=400)
@@ -317,11 +330,11 @@ with col1:
 
 with col2:
     # Payment evolution over time
-    payment_evolution = df[1::12]['monthly_payment'].values  # Yearly snapshots
+    payment_evolution = df[1::12]['total_payment'].values  # Yearly snapshots
     years_evolution = df[1::12]['year'].values
     
     fig_evolution = px.line(x=years_evolution, y=payment_evolution,
-                           title="Monthly Payment Evolution",
-                           labels={'x': 'Year', 'y': 'Monthly Payment (฿)'})
+                           title="Total Payment Evolution",
+                           labels={'x': 'Year', 'y': 'Total Payment (฿)'})
     fig_evolution.update_traces(line_color='#667eea', line_width=3)
     st.plotly_chart(fig_evolution, use_container_width=True)
