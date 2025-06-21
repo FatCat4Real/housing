@@ -11,49 +11,44 @@ DEFAULT_RAISE_AFTER_REFINANCE = 0
 DEFAULT_START_YEAR = 2026
 DEFAULT_START_MONTH = 1
 
-def calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refinance_cycle_years=0, raise_after_refinance=0):
-    left = debt
-    ton = [debt]
-    dok = [debt * interest * 31/365]
-    paid = [0]
-    monthly_payments = [monthly_payment]
-    years = [2026]
-    months = [1]
-    period = 1
-    year = 2026
-    month = 1
-    raise_ = 0
 
-    while left > 0:
+def calculate_loan_schedule_new(start_year, start_month, debt, interest_pct, monthly_payment, yearly_add_on):
+    year = start_year
+    month = start_month
+    left_balance = debt
+    period = 0
+
+    starting_balances = []
+    remaining_balances = []
+    principal_payments = []
+    interest_payments = []
+    total_payments = []
+    add_ons = []
+    years = []
+    months = []
+
+    while left_balance > 0:
+        starting_balances.append(left_balance)
+        
+        period += 1
+        
         # Interest for this period
         days_in_month = calendar.monthrange(year, month)[1]
-        interest_to_pay = left * interest * days_in_month / 365
+        interest_to_pay = left_balance * interest_pct * days_in_month / 365
 
         # Year-end additional payment
+        add_on = 0
         if period % 12 == 0:
             add_on = yearly_add_on
-        else:
-            add_on = 0
-        
-        # Refinance and payment structure change every x years
-        if refinance_cycle_years > 0 and period % (12 * refinance_cycle_years) == 0:
-            raise_ += raise_after_refinance
+        add_ons.append(add_on)
         
         # Principal payment for this period
-        # Ensure we have enough payment to cover interest, otherwise set principal payment to 0
-        total_available_payment = monthly_payment + add_on + raise_
-        if total_available_payment <= interest_to_pay:
-            # If payment doesn't cover interest, we can only pay what we have
-            ton_to_pay = 0
-        else:
-            # Normal case: payment covers interest plus some principal
-            principal_available = total_available_payment - interest_to_pay
-            ton_to_pay = min(left, principal_available)
+        total_available_payment = monthly_payment + add_ons[-1]
+        principal_available = total_available_payment - interest_to_pay
+        principal_payment = min(left_balance, principal_available)
 
         # Remaining principal
-        left -= ton_to_pay
-
-        period += 1
+        left_balance -= principal_payment + interest_to_pay
         
         if month == 12:
             month = 1
@@ -61,18 +56,24 @@ def calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refi
         else:
             month += 1
         
-        ton.append(left)
-        paid.append(ton_to_pay)
-        dok.append(interest_to_pay)
-        monthly_payments.append(monthly_payment + raise_)
+        remaining_balances.append(left_balance)
+        principal_payments.append(principal_payment)
+        interest_payments.append(interest_to_pay)
+        total_payments.append(principal_payment + interest_to_pay + add_on)
         years.append(year)
         months.append(month)
+        
+        # Check if remaining balance is decreasing
+        if len(remaining_balances) > 1 and remaining_balances[-1] > remaining_balances[-2]:
+            raise Exception("Remaining balance is not decreasing, something is wrong")
 
     df = pd.DataFrame({
-        'remaining_balance': ton,
-        'principal_payment': paid,
-        'interest_payment': dok,
-        'monthly_payment': monthly_payments,
+        'starting_balance': starting_balances,
+        'principal_payment': principal_payments,
+        'interest_payment': interest_payments,
+        'total_payment': total_payments,
+        'add_on': add_ons,
+        'remaining_balance': remaining_balances,
         'year': years,
         'month': months
     })
@@ -88,12 +89,23 @@ def calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refi
     return df
 
 debt = DEFAULT_HOUSE_PRICE - DEFAULT_DOWN_PAYMENT
-interest = DEFAULT_INTEREST_RATE / 100
+interest_pct = DEFAULT_INTEREST_RATE / 100
 monthly_payment = DEFAULT_MONTHLY_PAYMENT
 yearly_add_on = DEFAULT_YEARLY_ADD_ON
-refinance_cycle_years = DEFAULT_REFINANCE_CYCLE_YEARS
-raise_after_refinance = DEFAULT_RAISE_AFTER_REFINANCE
 
-df = calculate_loan_schedule(debt, interest, monthly_payment, yearly_add_on, refinance_cycle_years, raise_after_refinance)
+first_period_interest = debt * (interest_pct * 31 / 365)
 
-# print(df)
+if first_period_interest > monthly_payment:
+    print("Monthly payment is not enough to cover the interest for the first period")
+    exit()
+
+df = calculate_loan_schedule_new(
+    start_year=DEFAULT_START_YEAR, 
+    start_month=DEFAULT_START_MONTH, 
+    debt=debt, 
+    interest_pct=interest_pct, 
+    monthly_payment=monthly_payment, 
+    yearly_add_on=yearly_add_on
+)
+
+df
