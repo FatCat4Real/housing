@@ -354,6 +354,9 @@ def render_visualizations(df, mode="simple"):
         # display_df[col] = display_df[col].apply(lambda x: f"฿{x:,.0f}")
         display_df[col] = display_df[col].apply(lambda x: f"{x:,.0f}")
 
+    # Reorder columns
+    display_df = display_df[['Date', 'Starting Balance (฿)', 'Rate (%)', 'Payment (฿)', 'Top-up (฿)', 'Total (฿)', 'Principal (฿)', 'Interest (฿)', 'Remaining (฿)']]
+
     display_df = display_df.drop(columns=['Starting Balance (฿)'])
     
     st.dataframe(display_df.set_index('Date'), use_container_width=True, height=400)
