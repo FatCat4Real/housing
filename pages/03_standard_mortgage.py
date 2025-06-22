@@ -13,15 +13,9 @@ from utils.calculations import (
 )
 from utils.visualizations import render_summary_metrics, render_visualizations, render_property_info_form, render_top_up_section
 
-st.set_page_config(
-    page_title="Standard Mortgage - House Loan Planning",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # Page header
 st.markdown("""
-# 🧮 Standard Mortgage Calculator
+# Standard Mortgage Calculator
 
 **Traditional Mortgage Calculator with Payment Formulas**
 
@@ -34,11 +28,11 @@ house_price, down, debt = render_property_info_form()
 st.markdown("---")
 
 # Loan Term and Interest Configuration
-st.markdown("### 📈 Loan Configuration")
+st.markdown("### Loan Configuration")
 col1, col2 = st.columns(2)
 with col1:
     loan_years = st.number_input(
-        "📅 Loan Term (Years)", 
+        "Loan Term (Years)", 
         value=40, 
         min_value=1, 
         max_value=50, 
@@ -55,9 +49,9 @@ with col2:
 
 if rate_type == "Fixed Rate":
     # Fixed rate standard mortgage
-    st.markdown("### 📈 Interest Rate")
+    st.markdown("### Interest Rate")
     interest = st.number_input(
-        "📈 Interest Rate (%)", 
+        "Interest Rate (%)", 
         value=DEFAULT_INTEREST_RATE, 
         step=0.1, 
         format="%.1f",
@@ -68,7 +62,7 @@ if rate_type == "Fixed Rate":
     # Calculate and display the monthly payment
     if debt > 0:
         calculated_payment = calculate_monthly_payment(debt, interest, loan_years)
-        st.info(f"💳 **Calculated Monthly Payment: ฿{calculated_payment:,.2f}**")
+        st.info(f"**Calculated Monthly Payment: ฿{calculated_payment:,.2f}**")
     
     # Top up payment strategies
     top_up_params = render_top_up_section(key_prefix="fixed")
@@ -103,7 +97,7 @@ if rate_type == "Fixed Rate":
         
 else:
     # Variable rates standard mortgage
-    st.markdown("### 📈 Variable Interest Rates (Years 1,2,3,4,5,6+)")
+    st.markdown("### Variable Interest Rates (Years 1,2,3,4,5,6+)")
     
     # Collect 6 interest rates
     col1, col2, col3 = st.columns(3)
@@ -122,7 +116,7 @@ else:
     # Calculate and display the initial monthly payment
     if debt > 0:
         initial_payment = calculate_monthly_payment(debt, rates[0], loan_years)
-        st.info(f"💳 **Initial Monthly Payment (Year 1): ฿{initial_payment:,.2f}** (Payment will be recalculated each year)")
+        st.info(f"**Initial Monthly Payment (Year 1): ฿{initial_payment:,.2f}** (Payment will be recalculated each year)")
     
     # Top up payment strategies
     top_up_params = render_top_up_section(key_prefix="variable")
@@ -158,7 +152,7 @@ else:
 # Sidebar information
 with st.sidebar:
     st.markdown("""
-    ### 💡 How This Calculator Works
+    ### How This Calculator Works
     
     **Standard Formula**: Uses the traditional mortgage payment formula: 
     
@@ -176,7 +170,7 @@ with st.sidebar:
     
     ---
     
-    ### 📊 Key Features
+    ### Key Features
     - Accurate mortgage calculations
     - Fixed or variable rate options
     - Multiple top-up strategies
@@ -184,13 +178,13 @@ with st.sidebar:
     
     ---
     
-    ### ⚠️ Important Notes
+    ### Important Notes
     - Payments calculated automatically
     - Fixed payment schedule (except variable rates)
     - Standard banking formulas
     - Predictable payment amounts
     
-    ### 💡 Top-up Strategies
+    ### Top-up Strategies
     
     **Fixed Amount**: Ensure minimum payment  
     **Additional Amount**: Add extra each month  

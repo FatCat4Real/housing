@@ -10,15 +10,9 @@ from utils.constants import DEFAULT_INTEREST_RATE, DEFAULT_MONTHLY_PAYMENT, DEFA
 from utils.calculations import calculate_loan_schedule_simple, calculate_monthly_payment
 from utils.visualizations import render_summary_metrics
 
-st.set_page_config(
-    page_title="Loan Comparison - House Loan Planning",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # Page header
 st.markdown("""
-# 📊 Loan Comparison Tool
+# Loan Comparison Tool
 
 **Compare Different Loan Scenarios Side-by-Side**
 
@@ -30,7 +24,7 @@ if 'scenarios' not in st.session_state:
     st.session_state.scenarios = []
 
 # Scenario input section
-st.markdown("### ➕ Add New Scenario")
+st.markdown("### Add New Scenario")
 
 with st.form("new_scenario"):
     col1, col2, col3 = st.columns(3)
@@ -115,7 +109,7 @@ with st.form("new_scenario"):
                 })
                 
                 st.session_state.scenarios.append(scenario_data)
-                st.success(f"✅ Added scenario: {scenario_name}")
+                st.success(f"Added scenario: {scenario_name}")
                 st.rerun()
                 
             except Exception as e:
@@ -127,7 +121,7 @@ st.markdown("---")
 
 # Display scenarios comparison
 if st.session_state.scenarios:
-    st.markdown("### 📊 Scenario Comparison")
+    st.markdown("### Scenario Comparison")
     
     # Summary comparison table
     comparison_data = []
@@ -153,7 +147,7 @@ if st.session_state.scenarios:
     st.dataframe(comparison_df, use_container_width=True)
     
     # Detailed scenario cards
-    st.markdown("### 📋 Detailed Scenario Information")
+    st.markdown("### Detailed Scenario Information")
     
     # Create columns for scenarios
     num_scenarios = len(st.session_state.scenarios)
@@ -184,19 +178,19 @@ if st.session_state.scenarios:
                     st.metric("Effective Rate", f"{scenario['effective_rate']:.1f}%")
                 
                 # Remove scenario button
-                if st.button(f"🗑️ Remove", key=f"remove_{i}"):
+                if st.button(f"Remove", key=f"remove_{i}"):
                     st.session_state.scenarios.pop(i)
                     st.rerun()
                 
                 st.markdown("---")
     
     # Clear all scenarios button
-    if st.button("🗑️ Clear All Scenarios"):
+    if st.button("Clear All Scenarios"):
         st.session_state.scenarios = []
         st.rerun()
 
 else:
-    st.info("👆 Add your first scenario above to start comparing different loan options!")
+    st.info("Add your first scenario above to start comparing different loan options!")
 
 # Sidebar information
 with st.sidebar:

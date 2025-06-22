@@ -9,15 +9,9 @@ from utils.constants import DEFAULT_INTEREST_RATE, DEFAULT_MONTHLY_PAYMENT, DEFA
 from utils.calculations import calculate_loan_schedule_simple
 from utils.visualizations import render_summary_metrics, render_visualizations, render_property_info_form
 
-st.set_page_config(
-    page_title="Simple Calculator - House Loan Planning",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # Page header
 st.markdown("""
-# 💰 Simple Loan Calculator
+# Simple Loan Calculator
 
 **Manual Payment Input with Fixed Interest Rate**
 
@@ -30,9 +24,9 @@ house_price, down, debt = render_property_info_form()
 st.markdown("---")
 
 # Interest Rate Configuration
-st.markdown("### 📈 Interest Rate")
+st.markdown("### Interest Rate")
 interest = st.number_input(
-    "📈 Interest Rate (%)", 
+    "Interest Rate (%)", 
     value=DEFAULT_INTEREST_RATE, 
     step=0.1, 
     format="%.1f",
@@ -41,11 +35,11 @@ interest = st.number_input(
 interest = interest / 100
 
 # Payment Structure
-st.markdown("### 💳 Payment Structure")
+st.markdown("### Payment Structure")
 col1, col2 = st.columns(2)
 with col1:
     monthly_payment = st.number_input(
-        "💵 Monthly Payment (฿)", 
+        "Monthly Payment (฿)", 
         value=DEFAULT_MONTHLY_PAYMENT, 
         step=1000, 
         format="%d",
@@ -53,7 +47,7 @@ with col1:
     )
 with col2:
     yearly_add_on = st.number_input(
-        "📈 Yearly Add-on (฿)", 
+        "Yearly Add-on (฿)", 
         value=DEFAULT_YEARLY_ADD_ON, 
         step=10_000, 
         format="%d",
@@ -88,7 +82,7 @@ else:
 # Sidebar information
 with st.sidebar:
     st.markdown("""
-    ### 💡 How This Calculator Works
+    ### How This Calculator Works
     
     **Fixed Interest Rate**: Uses a single interest rate throughout the loan period.
     
@@ -100,7 +94,7 @@ with st.sidebar:
     
     ---
     
-    ### 📊 Key Features
+    ### Key Features
     - Simple and straightforward
     - Fixed monthly payments
     - Flexible payment amounts
@@ -108,7 +102,7 @@ with st.sidebar:
     
     ---
     
-    ### ⚠️ Important Notes
+    ### Important Notes
     - Monthly payment must cover interest
     - Lower payments = longer loan term
     - Higher payments = shorter loan term

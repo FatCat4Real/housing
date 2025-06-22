@@ -9,15 +9,9 @@ from utils.constants import DEFAULT_INTEREST_RATE, DEFAULT_MONTHLY_PAYMENT, DEFA
 from utils.calculations import calculate_loan_schedule_variable_rates
 from utils.visualizations import render_summary_metrics, render_visualizations, render_property_info_form
 
-st.set_page_config(
-    page_title="Variable Rate Calculator - House Loan Planning",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 # Page header
 st.markdown("""
-# 📈 Variable Rate Loan Calculator
+# Variable Rate Loan Calculator
 
 **Manual Payment Input with Variable Interest Rates**
 
@@ -30,7 +24,7 @@ house_price, down, debt = render_property_info_form()
 st.markdown("---")
 
 # Interest Rate & Payment Configuration
-st.markdown("### 📈💳 Interest Rate & Payment Configuration")
+st.markdown("### Interest Rate & Payment Configuration")
 
 # Initialize session state for additional years
 if 'additional_years' not in st.session_state:
@@ -118,18 +112,18 @@ with col_payment_onwards:
 # Buttons for adding/removing years
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("➕ Add Another Year"):
+    if st.button("Add Another Year"):
         st.session_state.additional_years += 1
         st.rerun()
 with col2:
-    if st.session_state.additional_years > 0 and st.button("➖ Remove Last Year"):
+    if st.session_state.additional_years > 0 and st.button("Remove Last Year"):
         st.session_state.additional_years -= 1
         st.rerun()
 
 # Additional Payment Options
-st.markdown("### 📈 Additional Payment Options")
+st.markdown("### Additional Payment Options")
 yearly_add_on = st.number_input(
-    "📈 Yearly Add-on (฿)", 
+    "Yearly Add-on (฿)", 
     value=DEFAULT_YEARLY_ADD_ON, 
     step=10_000, 
     format="%d",
@@ -164,7 +158,7 @@ else:
 # Sidebar information
 with st.sidebar:
     st.markdown("""
-    ### 💡 How This Calculator Works
+    ### How This Calculator Works
     
     **Variable Interest Rates**: Different rates for different years of the loan.
     
@@ -176,7 +170,7 @@ with st.sidebar:
     
     ---
     
-    ### 📊 Key Features
+    ### Key Features
     - Year-specific interest rates
     - Year-specific payment amounts
     - Dynamic year configuration
@@ -184,13 +178,13 @@ with st.sidebar:
     
     ---
     
-    ### ⚠️ Important Notes
+    ### Important Notes
     - Each payment must cover its year's interest
     - Rates and payments change annually
     - Use for complex loan structures
     - Plan for rate adjustments over time
     
-    ### 💡 Use Cases
+    ### Use Cases
     - Promotional rates for first few years
     - Income changes over time
     - Step-up loan programs
