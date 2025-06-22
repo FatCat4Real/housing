@@ -1,7 +1,0 @@
-cal each month payment first and then fix them
-
-then cal topup to reduce the years
-
-if recal monthly payment, years might not decrease
-
-use monthly payment values from initialization, e.g. 25k at year 6++

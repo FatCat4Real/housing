@@ -46,18 +46,24 @@ def calculate_monthly_payment(principal: float, annual_rate: float, years: int) 
     return payment
 
 def calculate_top_up_amount(base_payment, top_up_params):
-    """Calculate top-up amount based on minimum payment and additional amount"""
-    if not top_up_params:
+    """Calculate top-up amount based on strategy"""
+    if not top_up_params or top_up_params.get("strategy") == "none":
         return 0
     
-    minimum_payment = top_up_params.get("minimum_payment", 0)
-    additional_amount = top_up_params.get("additional_amount", 0)
+    strategy = top_up_params.get("strategy")
+    amount = top_up_params.get("amount", 0)
     
-    # Calculate effective payment: max(base_payment, minimum_payment) + additional_amount
-    effective_payment = max(base_payment, minimum_payment) + additional_amount
-    
-    # Return the top-up amount (difference from base payment)
-    return effective_payment - base_payment
+    if strategy == "fixed":
+        # Top up to at least X amount
+        return max(0, amount - base_payment)
+    elif strategy == "additional":
+        # Add X amount to the payment
+        return amount
+    elif strategy == "percentage":
+        # Increase payment by X%
+        return base_payment * (amount / 100)
+    else:
+        return 0
 
 @st.cache_data
 def calculate_standard_mortgage_schedule(start_year, start_month, debt, annual_rate, years, yearly_add_on, top_up_params=None):
@@ -259,7 +265,7 @@ def calculate_variable_rate_mortgage_schedule(start_year, start_month, debt, int
     
     return df
 
-def render_summary_metrics(df, debt, baseline_df=None):
+def render_summary_metrics(df, debt):
     """Render the summary metrics section"""
     total_months = len(df)
     total_full_years = int(total_months / 12)
@@ -270,41 +276,12 @@ def render_summary_metrics(df, debt, baseline_df=None):
 
     st.markdown("### 📈 Loan Summary")
 
-    # Calculate baseline metrics if provided
-    baseline_months = None
-    baseline_interest = None
-    duration_delta = None
-    interest_delta = None
-    
-    if baseline_df is not None:
-        baseline_months = len(baseline_df)
-        baseline_interest = baseline_df['interest_payment'].sum()
-        
-        # Calculate savings
-        months_saved = baseline_months - total_months
-        interest_saved = baseline_interest - total_interest
-        
-        # Format duration savings
-        years_saved = int(months_saved / 12)
-        months_saved_remainder = months_saved - (years_saved * 12)
-        
-        if years_saved > 0 and months_saved_remainder > 0:
-            duration_delta = f"-{years_saved}y {months_saved_remainder}m"
-        elif years_saved > 0:
-            duration_delta = f"-{years_saved}y"
-        elif months_saved_remainder > 0:
-            duration_delta = f"-{months_saved_remainder}m"
-        else:
-            duration_delta = "0m"
-            
-        interest_delta = f"-฿{interest_saved:,.0f}" if interest_saved > 0 else f"฿{abs(interest_saved):,.0f}"
-
     # Stack metrics in 2 rows of 2 for smaller, less crowded layout
-    col1, col2, col3= st.columns((1, 1.2, 1.2))
+    col1, col2, col3= st.columns((1, 1.5, 1.5))
     with col1:
-        st.metric("⏱️ Total Duration", f"{total_full_years}y {total_full_months}m", delta=duration_delta, border=True)
+        st.metric("⏱️ Total Duration", f"{total_full_years}y {total_full_months}m", border=True)
     with col2:
-        st.metric("💰 Total Interest", f"฿{total_interest:,.0f}", delta=interest_delta, border=True)
+        st.metric("💰 Total Interest", f"฿{total_interest:,.0f}", border=True)
     with col3:
         st.metric("💸 Total Paid", f"฿{total_paid:,.0f}", border=True)
     
@@ -345,18 +322,14 @@ def render_visualizations(df, mode="simple"):
     display_df.columns = ['Date', 'Starting Balance (฿)', 'Rate (%)', 'Payment (฿)', 'Principal (฿)', 'Interest (฿)', 'Total (฿)', 'Top-up (฿)', 'Remaining (฿)']
     
     # Format rate column
-    # display_df['Rate (%)'] = display_df['Rate (%)'].apply(lambda x: f"{x:.3f}%")
-    display_df['Rate (%)'] = display_df['Rate (%)'].apply(lambda x: f"{x:.3f}")
+    display_df['Rate (%)'] = display_df['Rate (%)'].apply(lambda x: f"{x:.3f}%")
     
     # Format all monetary columns
     format_cols = ['Starting Balance (฿)', 'Payment (฿)', 'Principal (฿)', 'Interest (฿)', 'Total (฿)', 'Top-up (฿)', 'Remaining (฿)']
     for col in format_cols:
-        # display_df[col] = display_df[col].apply(lambda x: f"฿{x:,.0f}")
-        display_df[col] = display_df[col].apply(lambda x: f"{x:,.0f}")
-
-    display_df = display_df.drop(columns=['Starting Balance (฿)'])
+        display_df[col] = display_df[col].apply(lambda x: f"฿{x:,.0f}")
     
-    st.dataframe(display_df.set_index('Date'), use_container_width=True, height=400)
+    st.dataframe(display_df, use_container_width=True, height=400)
 
 def render_property_info_form():
     """Render property information form - shared component"""
@@ -378,33 +351,46 @@ def render_property_info_form():
 def render_top_up_section(key_prefix=""):
     """Render top-up payment section - shared component"""
     # st.markdown("### 💰 Top Up Payment")
+    top_up_strategy = st.selectbox(
+        "Top Up Strategy",
+        options=["None", "Fixed Amount", "Additional Amount", "Percentage Increase"],
+        help="Choose how to add extra payments to principal",
+        key=f"{key_prefix}_strategy"
+    )
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        minimum_payment = st.number_input(
-            "💰 Minimum Payment (฿)", 
-            value=0, 
+    top_up_params = {}
+    if top_up_strategy == "Fixed Amount":
+        top_up_amount = st.number_input(
+            "💰 Top up to at least (฿)", 
+            value=20000, 
             step=1000, 
             format="%d", 
-            help="Only used when higher than required payment. Payment = MAX(required_payment, minimum_payment)",
-            key=f"{key_prefix}_minimum"
+            help="If calculated payment is less than this amount, the difference goes to principal",
+            key=f"{key_prefix}_fixed"
         )
-    
-    with col2:
+        top_up_params = {"strategy": "fixed", "amount": top_up_amount}
+    elif top_up_strategy == "Additional Amount":
         additional_amount = st.number_input(
-            "💰 Additional Amount (฿)", 
-            value=0, 
+            "💰 Additional amount (฿)", 
+            value=5000, 
             step=1000, 
             format="%d",
-            help="Extra amount to add on top of the effective payment each month",
+            help="Add this amount to the required payment each month",
             key=f"{key_prefix}_additional"
         )
-    
-    top_up_params = {
-        "minimum_payment": minimum_payment,
-        "additional_amount": additional_amount
-    }
+        top_up_params = {"strategy": "additional", "amount": additional_amount}
+    elif top_up_strategy == "Percentage Increase":
+        percentage = st.number_input(
+            "💰 Percentage increase (%)", 
+            value=10.0, 
+            step=1.0, 
+            format="%.1f",
+            help="Increase the required payment by this percentage",
+            key=f"{key_prefix}_percentage"
+        )
+        top_up_params = {"strategy": "percentage", "amount": percentage}
+    else:
+        top_up_params = {"strategy": "none", "amount": 0}
     
     return top_up_params
 
@@ -442,7 +428,7 @@ with col3:
     rate_type = st.radio(
         "Interest Rate Type:", 
         # ["Fixed Rate", "Variable Rates (6 periods)"],
-        ["Variable", "Fixed"],
+        ["Fixed", "Variable"],
         help="Choose between a single fixed rate or variable rates for different periods",
         horizontal=True
     )
@@ -465,7 +451,7 @@ if rate_type == "Fixed":
         # st.info(f"**Calculated Monthly Payment: ฿{calculated_payment:,.2f}**")
     
     # Top up payment strategies
-    top_up_params = render_top_up_section(key_prefix="topup")
+    top_up_params = render_top_up_section(key_prefix="fixed")
     
     yearly_add_on = 0  # No additional payments for standard mortgage
 
@@ -475,19 +461,6 @@ if rate_type == "Fixed":
     if debt > 0:
         with st.spinner('Calculating standard mortgage schedule...'):
             try:
-                # Calculate baseline (no top-up payments)
-                baseline_params = {"minimum_payment": 0, "additional_amount": 0}
-                baseline_df, baseline_payment = calculate_standard_mortgage_schedule(
-                    start_year=DEFAULT_START_YEAR, 
-                    start_month=DEFAULT_START_MONTH, 
-                    debt=debt, 
-                    annual_rate=interest, 
-                    years=loan_years,
-                    yearly_add_on=yearly_add_on,
-                    top_up_params=baseline_params
-                )
-                
-                # Calculate current scenario (with top-up payments)
                 df, monthly_payment = calculate_standard_mortgage_schedule(
                     start_year=DEFAULT_START_YEAR, 
                     start_month=DEFAULT_START_MONTH, 
@@ -498,8 +471,8 @@ if rate_type == "Fixed":
                     top_up_params=top_up_params
                 )
 
-                # Render results with baseline comparison
-                total_interest, total_principal = render_summary_metrics(df, debt, baseline_df)
+                # Render results
+                total_interest, total_principal = render_summary_metrics(df, debt)
                 render_visualizations(df, mode="standard")
 
             except Exception as e:
@@ -535,7 +508,7 @@ else:
         # st.info(f"**Initial Monthly Payment (Year 1): ฿{initial_payment:,.2f}** (Payment will be recalculated each year)")
     
     # Top up payment strategies
-    top_up_params = render_top_up_section(key_prefix="topup")
+    top_up_params = render_top_up_section(key_prefix="variable")
     
     yearly_add_on = 0  # No additional payments for standard mortgage
 
@@ -545,19 +518,6 @@ else:
     if debt > 0:
         with st.spinner('Calculating variable rate mortgage schedule...'):
             try:
-                # Calculate baseline (no top-up payments)
-                baseline_params = {"minimum_payment": 0, "additional_amount": 0}
-                baseline_df = calculate_variable_rate_mortgage_schedule(
-                    start_year=DEFAULT_START_YEAR, 
-                    start_month=DEFAULT_START_MONTH, 
-                    debt=debt, 
-                    interest_rates_list=rates, 
-                    years=loan_years,
-                    yearly_add_on=yearly_add_on,
-                    top_up_params=baseline_params
-                )
-                
-                # Calculate current scenario (with top-up payments)
                 df = calculate_variable_rate_mortgage_schedule(
                     start_year=DEFAULT_START_YEAR, 
                     start_month=DEFAULT_START_MONTH, 
@@ -568,8 +528,8 @@ else:
                     top_up_params=top_up_params
                 )
 
-                # Render results with baseline comparison
-                total_interest, total_principal = render_summary_metrics(df, debt, baseline_df)
+                # Render results
+                total_interest, total_principal = render_summary_metrics(df, debt)
                 render_visualizations(df, mode="variable_standard")
 
             except Exception as e:
