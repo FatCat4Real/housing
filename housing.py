@@ -2,7 +2,7 @@ import streamlit as st
 
 # Page configuration
 st.set_page_config(
-    page_title='🏠 House Loan Planning Calculator',
+    page_title='House Loan Planning Calculator',
     layout='wide',
     initial_sidebar_state='expanded'
 )
@@ -42,7 +42,7 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <h1 style="color: white; text-align: center; margin: 0;">
-        🏠 House Loan Planning Calculator
+        House Loan Planning Calculator
     </h1>
     <p style="color: white; text-align: center; margin: 0.5rem 0 0 0;">
         Plan your mortgage payments with detailed analysis and visualizations
@@ -52,16 +52,16 @@ st.markdown("""
 
 # Welcome content
 st.markdown("""
-## Welcome to the House Loan Planning Calculator! 🏡
+## Welcome to the House Loan Planning Calculator!
 
 This comprehensive tool helps you analyze different mortgage scenarios and plan your loan payments effectively. 
 
 ### Available Calculators:
 
-- **🏠 Home**: Overview and navigation (this page)
-- **💰 Simple Calculator**: Manual payment input with fixed interest rate
-- **📈 Variable Rate Calculator**: Manual payment input with different rates by year  
-- **🧮 Standard Mortgage**: Traditional mortgage calculator with payment formulas
+- **Home**: Overview and navigation (this page)
+- **Simple Calculator**: Manual payment input with fixed interest rate
+- **Variable Rate Calculator**: Manual payment input with different rates by year  
+- **Standard Mortgage**: Traditional mortgage calculator with payment formulas
 
 ### Getting Started:
 
@@ -72,12 +72,12 @@ This comprehensive tool helps you analyze different mortgage scenarios and plan 
 
 ### Features:
 
-✅ **Multiple calculation methods** to suit different scenarios  
-✅ **Variable interest rates** for more realistic planning  
-✅ **Top-up payment strategies** to reduce loan duration  
-✅ **Detailed payment schedules** with monthly breakdowns  
-✅ **Summary metrics** including total interest and effective rates  
-✅ **Export-ready data** for further analysis  
+- **Multiple calculation methods** to suit different scenarios  
+- **Variable interest rates** for more realistic planning  
+- **Top-up payment strategies** to reduce loan duration  
+- **Detailed payment schedules** with monthly breakdowns  
+- **Summary metrics** including total interest and effective rates  
+- **Export-ready data** for further analysis  
 
 ---
 
@@ -87,26 +87,26 @@ This comprehensive tool helps you analyze different mortgage scenarios and plan 
 # Sidebar information
 with st.sidebar:
     st.markdown("""
-    ### 📋 Quick Guide
+    ### Quick Guide
     
     **Simple Calculator**  
-    → Fixed interest rate  
-    → Manual payment amounts  
-    → Basic loan analysis  
+    - Fixed interest rate  
+    - Manual payment amounts  
+    - Basic loan analysis  
     
     **Variable Rate Calculator**  
-    → Different rates by year  
-    → Manual payment amounts  
-    → Advanced scenario planning  
+    - Different rates by year  
+    - Manual payment amounts  
+    - Advanced scenario planning  
     
     **Standard Mortgage**  
-    → Calculated payments  
-    → Fixed or variable rates  
-    → Traditional mortgage formulas  
+    - Calculated payments  
+    - Fixed or variable rates  
+    - Traditional mortgage formulas  
     
     ---
     
-    ### 💡 Tips
+    ### Tips
     - Start with property information
     - Consider top-up payments to save interest
     - Compare different scenarios
