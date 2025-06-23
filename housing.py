@@ -213,7 +213,7 @@ def calculate_standard_mortgage_schedule(start_year, start_month, debt, annual_r
     return df, monthly_payment
 
 @st.cache_data
-def calculate_variable_rate_mortgage_schedule(start_year, start_month, debt, interest_rates_list, years, yearly_add_on, top_up_params=None):
+def calculate_variable_rate_mortgage_schedule(start_year, start_month, debt, interest_rates_list, years, yearly_add_on, top_up_params=None, refinance_params=None):
     """Variable rate mortgage calculation based on the original minimum_monthly_payment.py logic"""
     if len(interest_rates_list) != 6:
         raise ValueError("Must provide exactly 6 interest rates for years 1,2,3,4,5,6+")
@@ -224,12 +224,28 @@ def calculate_variable_rate_mortgage_schedule(start_year, start_month, debt, int
     
     for loan_year in range(1, years + 1):
         # Determine which interest rate to use
-        if loan_year <= 5:
-            rate_index = loan_year - 1  # Years 1-5 use rates 0-4
+        if refinance_params:
+            # Use refinancing logic
+            cycle_years = refinance_params.get("cycle_years", 3)
+            cycle_position = ((loan_year - 1) % cycle_years)  # 0-based position in cycle
+            
+            if cycle_position < len(interest_rates_list):
+                rate_index = cycle_position
+            else:
+                rate_index = len(interest_rates_list) - 1  # Use last rate if cycle exceeds available rates
         else:
-            rate_index = 5  # Year 6+ uses rate 5
+            # Original logic
+            if loan_year <= 5:
+                rate_index = loan_year - 1  # Years 1-5 use rates 0-4
+            else:
+                rate_index = 5  # Year 6+ uses rate 5
         
         current_rate = interest_rates_list[rate_index]
+        
+        # Apply rate gain if principal threshold is met
+        if refinance_params and refinance_params.get("principal_threshold", 0) > 0:
+            if remaining_balance <= refinance_params["principal_threshold"]:
+                current_rate += refinance_params.get("rate_gain", 0)
         remaining_years = years - loan_year + 1
         
         # Calculate monthly payment for this year based on remaining balance and years
@@ -318,7 +334,7 @@ def calculate_variable_rate_mortgage_schedule(start_year, start_month, debt, int
     
     return df
 
-def render_summary_metrics(df, debt, baseline_df=None):
+def render_summary_metrics(df, debt):
     """Render the summary metrics section"""
     total_months = len(df)
     total_full_years = int(total_months / 12)
@@ -328,35 +344,6 @@ def render_summary_metrics(df, debt, baseline_df=None):
     total_paid = total_interest + total_principal
 
     st.markdown("### 📈 Loan Summary")
-
-    # Calculate baseline metrics if provided
-    baseline_months = None
-    baseline_interest = None
-    duration_delta = None
-    interest_delta = None
-    
-    if baseline_df is not None:
-        baseline_months = len(baseline_df)
-        baseline_interest = baseline_df['interest_payment'].sum()
-        
-        # Calculate savings
-        months_saved = baseline_months - total_months
-        interest_saved = baseline_interest - total_interest
-        
-        # Format duration savings
-        years_saved = int(months_saved / 12)
-        months_saved_remainder = months_saved - (years_saved * 12)
-        
-        if years_saved > 0 and months_saved_remainder > 0:
-            duration_delta = f"-{years_saved}y {months_saved_remainder}m"
-        elif years_saved > 0:
-            duration_delta = f"-{years_saved}y"
-        elif months_saved_remainder > 0:
-            duration_delta = f"-{months_saved_remainder}m"
-        else:
-            duration_delta = "0m"
-            
-        interest_delta = f"-฿{interest_saved:,.0f}" if interest_saved > 0 else f"฿{abs(interest_saved):,.0f}"
 
     # Calculate average payments for different periods
     # Add relative year column for easier filtering
@@ -381,9 +368,9 @@ def render_summary_metrics(df, debt, baseline_df=None):
     # Stack metrics in 2 rows of 2 for smaller, less crowded layout
     col1, col2, col3= st.columns((1, 1.2, 1.2))
     with col1:
-        st.metric("⏱️ Total Duration", f"{total_full_years}y {total_full_months}m", delta=duration_delta, border=True, delta_color='inverse')
+        st.metric("⏱️ Total Duration", f"{total_full_years}y {total_full_months}m", border=True)
     with col2:
-        st.metric("💰 Total Interest", f"฿{total_interest:,.0f}", delta=interest_delta, border=True, delta_color='inverse')
+        st.metric("💰 Total Interest", f"฿{total_interest:,.0f}", border=True)
     with col3:
         st.metric("💸 Total Paid", f"฿{total_paid:,.0f}", border=True)
     
@@ -673,19 +660,7 @@ if rate_type == "Fixed":
     if debt > 0:
         with st.spinner('Calculating standard mortgage schedule...'):
             try:
-                # Calculate baseline (no top-up payments)
-                baseline_params = {"minimum_payment": 0, "additional_amount": 0}
-                baseline_df, baseline_payment = calculate_standard_mortgage_schedule(
-                    start_year=DEFAULT_START_YEAR, 
-                    start_month=DEFAULT_START_MONTH, 
-                    debt=debt, 
-                    annual_rate=interest, 
-                    years=loan_years,
-                    yearly_add_on=yearly_add_on,
-                    top_up_params=baseline_params
-                )
-                
-                # Calculate current scenario (with top-up payments)
+                # Calculate current scenario
                 df, monthly_payment = calculate_standard_mortgage_schedule(
                     start_year=DEFAULT_START_YEAR, 
                     start_month=DEFAULT_START_MONTH, 
@@ -696,8 +671,8 @@ if rate_type == "Fixed":
                     top_up_params=top_up_params
                 )
 
-                # Render results with baseline comparison
-                total_interest, total_principal = render_summary_metrics(df, debt, baseline_df)
+                # Render results
+                total_interest, total_principal = render_summary_metrics(df, debt)
                 render_visualizations(df, mode="standard")
 
             except Exception as e:
@@ -727,6 +702,54 @@ else:
     
     rates = [rate1/100, rate2/100, rate3/100, rate4/100, rate5/100, rate6/100]
     
+    # Refinance options
+    # st.markdown("### 🔄 Refinance Options")
+    
+    refinance_enabled = st.checkbox("Enable Refinancing", help="Enable refinancing options to modify interest rate behavior")
+    
+    # Always show fields but only use values when checkbox is enabled
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        refinance_cycle_years = st.number_input(
+            "Every X years", 
+            value=3, 
+            min_value=1, 
+            max_value=10, 
+            step=1,
+            help="Interest rates will cycle every X years (e.g., if 3: year 4 uses year 1's rate, year 7 uses year 1's rate, etc.)",
+            disabled=not refinance_enabled
+        )
+    
+    with col2:
+        principal_threshold = st.number_input(
+            "When principal < (฿)", 
+            value=0, 
+            step=100_000, 
+            format="%d",
+            help="When remaining principal is below this amount, apply additional interest rate gain",
+            disabled=not refinance_enabled
+        )
+    
+    with col3:
+        interest_rate_gain = st.number_input(
+            "Interest rate will gain (%)", 
+            value=0.0, 
+            step=0.001, 
+            format="%.3f",
+            help="Additional interest rate to add when principal is below threshold",
+            disabled=not refinance_enabled
+        )
+    
+    # Only create refinance_params when enabled
+    refinance_params = None
+    if refinance_enabled:
+        refinance_params = {
+            "cycle_years": refinance_cycle_years,
+            "principal_threshold": principal_threshold,
+            "rate_gain": interest_rate_gain / 100
+        }
+    
     # Calculate and display the initial monthly payment
     if debt > 0:
         initial_payment = calculate_monthly_payment(debt, rates[0], loan_years)
@@ -743,19 +766,7 @@ else:
     if debt > 0:
         with st.spinner('Calculating variable rate mortgage schedule...'):
             try:
-                # Calculate baseline (no top-up payments)
-                baseline_params = {"minimum_payment": 0, "additional_amount": 0}
-                baseline_df = calculate_variable_rate_mortgage_schedule(
-                    start_year=DEFAULT_START_YEAR, 
-                    start_month=DEFAULT_START_MONTH, 
-                    debt=debt, 
-                    interest_rates_list=rates, 
-                    years=loan_years,
-                    yearly_add_on=yearly_add_on,
-                    top_up_params=baseline_params
-                )
-                
-                # Calculate current scenario (with top-up payments)
+                # Calculate current scenario
                 df = calculate_variable_rate_mortgage_schedule(
                     start_year=DEFAULT_START_YEAR, 
                     start_month=DEFAULT_START_MONTH, 
@@ -763,11 +774,12 @@ else:
                     interest_rates_list=rates, 
                     years=loan_years,
                     yearly_add_on=yearly_add_on,
-                    top_up_params=top_up_params
+                    top_up_params=top_up_params,
+                    refinance_params=refinance_params
                 )
 
-                # Render results with baseline comparison
-                total_interest, total_principal = render_summary_metrics(df, debt, baseline_df)
+                # Render results
+                total_interest, total_principal = render_summary_metrics(df, debt)
                 render_visualizations(df, mode="variable_standard")
 
             except Exception as e:
