@@ -5,7 +5,7 @@ import calendar
 # Page configuration
 st.set_page_config(
     page_title='House Loan Planning Calculator - Standard Mortgage',
-    initial_sidebar_state='expanded'
+    initial_sidebar_state='collapsed'
 )
 
 # Constants
@@ -302,9 +302,9 @@ def render_summary_metrics(df, debt, baseline_df=None):
     # Stack metrics in 2 rows of 2 for smaller, less crowded layout
     col1, col2, col3= st.columns((1, 1.2, 1.2))
     with col1:
-        st.metric("⏱️ Total Duration", f"{total_full_years}y {total_full_months}m", delta=duration_delta, border=True)
+        st.metric("⏱️ Total Duration", f"{total_full_years}y {total_full_months}m", delta=duration_delta, border=True, delta_color='inverse')
     with col2:
-        st.metric("💰 Total Interest", f"฿{total_interest:,.0f}", delta=interest_delta, border=True)
+        st.metric("💰 Total Interest", f"฿{total_interest:,.0f}", delta=interest_delta, border=True, delta_color='inverse')
     with col3:
         st.metric("💸 Total Paid", f"฿{total_paid:,.0f}", border=True)
     
