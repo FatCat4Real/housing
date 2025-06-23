@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import calendar
-import json
 
 # Page configuration
 st.set_page_config(
@@ -15,6 +14,70 @@ DEFAULT_INTEREST_RATE = 4.0
 DEFAULT_START_YEAR = 2026
 DEFAULT_START_MONTH = 1
 DEFAULT_VARIABLE_RATES = [2.3, 2.9, 3.5, 4.495, 4.495, 5.495]
+
+# Configuration Presets - Inline Python dictionaries (no JSON files needed)
+HOUSE_INTEREST_CONFIGS = [
+    {
+        "CONFIG_NAME": "Default House 4.3M",
+        "DEFAULT_HOUSE_PRICE": 4300000,
+        "LOAN_TERM": 40,
+        "INTEREST_TYPE": "Variable",
+        "DEFAULT_INTEREST_RATE": 4.0,
+        "DEFAULT_VARIABLE_RATES": [2.3, 2.9, 3.5, 4.495, 4.495, 5.495]
+    },
+    {
+        "CONFIG_NAME": "30-Year Variable",
+        "DEFAULT_HOUSE_PRICE": 4300000,
+        "LOAN_TERM": 30,
+        "INTEREST_TYPE": "Variable",
+        "DEFAULT_INTEREST_RATE": 4.0,
+        "DEFAULT_VARIABLE_RATES": [2.3, 2.9, 3.5, 4.495, 4.495, 5.495]
+    },
+    {
+        "CONFIG_NAME": "Low Interest 3.5M",
+        "DEFAULT_HOUSE_PRICE": 3500000,
+        "LOAN_TERM": 35,
+        "INTEREST_TYPE": "Fixed",
+        "DEFAULT_INTEREST_RATE": 3.5,
+        "DEFAULT_VARIABLE_RATES": [2.0, 2.5, 3.0, 3.8, 3.8, 4.5]
+    },
+    {
+        "CONFIG_NAME": "High Value 6M",
+        "DEFAULT_HOUSE_PRICE": 6000000,
+        "LOAN_TERM": 40,
+        "INTEREST_TYPE": "Variable",
+        "DEFAULT_INTEREST_RATE": 4.5,
+        "DEFAULT_VARIABLE_RATES": [2.5, 3.1, 3.7, 4.7, 4.7, 5.7]
+    }
+]
+
+STRATEGY_CONFIGS = [
+    {
+        "CONFIG_NAME": "No Extra Payment",
+        "MINIMUM_PAYMENT": 0,
+        "ADDITIONAL_AMOUNT": 0
+    },
+    {
+        "CONFIG_NAME": "20k a month",
+        "MINIMUM_PAYMENT": 15000,
+        "ADDITIONAL_AMOUNT": 5000
+    },
+    {
+        "CONFIG_NAME": "20k a month (v2)",
+        "MINIMUM_PAYMENT": 20000,
+        "ADDITIONAL_AMOUNT": 0
+    },
+    {
+        "CONFIG_NAME": "Aggressive 30k",
+        "MINIMUM_PAYMENT": 30000,
+        "ADDITIONAL_AMOUNT": 0
+    },
+    {
+        "CONFIG_NAME": "Conservative 10k",
+        "MINIMUM_PAYMENT": 10000,
+        "ADDITIONAL_AMOUNT": 0
+    }
+]
 
 # Utility Functions
 def calculate_monthly_payment(principal: float, annual_rate: float, years: int) -> float:
@@ -454,89 +517,69 @@ with st.sidebar:
     selected_house_config_name = "None"
     selected_strategy_config_name = "None"
     
-    # Load house/interest configurations
+    # Load house/interest configurations (inline)
     st.markdown("### 🏠 House & Interest Presets")
-    try:
-        with open('config_house_interests.json', 'r') as f:
-            house_configs_list = json.load(f)
+    
+    # Extract house config names for dropdown
+    house_config_names = ["None"] + [config.get("CONFIG_NAME", f"House Config {i+1}") for i, config in enumerate(HOUSE_INTEREST_CONFIGS)]
+    
+    # House configuration selector
+    selected_house_config = st.selectbox(
+        "Choose house & interest preset:",
+        options=house_config_names,
+        help="Select a predefined house and interest configuration",
+        key="house_config"
+    )
+    
+    # Load selected house configuration
+    if selected_house_config != "None":
+        # Find the selected configuration
+        selected_house_config_data = None
+        for config in HOUSE_INTEREST_CONFIGS:
+            if config.get("CONFIG_NAME") == selected_house_config:
+                selected_house_config_data = config
+                break
         
-        # Extract house config names for dropdown
-        house_config_names = ["None"] + [config.get("CONFIG_NAME", f"House Config {i+1}") for i, config in enumerate(house_configs_list)]
-        
-        # House configuration selector
-        selected_house_config = st.selectbox(
-            "Choose house & interest preset:",
-            options=house_config_names,
-            help="Select a configuration from config_house_interests.json",
-            key="house_config"
-        )
-        
-        # Load selected house configuration
-        if selected_house_config != "None":
-            # Find the selected configuration
-            selected_house_config_data = None
-            for config in house_configs_list:
-                if config.get("CONFIG_NAME") == selected_house_config:
-                    selected_house_config_data = config
-                    break
+        if selected_house_config_data:
+            selected_house_config_name = selected_house_config
+            config_house_price = selected_house_config_data.get("DEFAULT_HOUSE_PRICE", DEFAULT_HOUSE_PRICE)
+            config_interest_rate = selected_house_config_data.get("DEFAULT_INTEREST_RATE", DEFAULT_INTEREST_RATE)
+            config_variable_rates = selected_house_config_data.get("DEFAULT_VARIABLE_RATES", DEFAULT_VARIABLE_RATES.copy())
+            config_loan_term = selected_house_config_data.get("LOAN_TERM", 40)
+            config_interest_type = selected_house_config_data.get("INTEREST_TYPE", "Variable")
             
-            if selected_house_config_data:
-                selected_house_config_name = selected_house_config
-                config_house_price = selected_house_config_data.get("DEFAULT_HOUSE_PRICE", DEFAULT_HOUSE_PRICE)
-                config_interest_rate = selected_house_config_data.get("DEFAULT_INTEREST_RATE", DEFAULT_INTEREST_RATE)
-                config_variable_rates = selected_house_config_data.get("DEFAULT_VARIABLE_RATES", DEFAULT_VARIABLE_RATES.copy())
-                config_loan_term = selected_house_config_data.get("LOAN_TERM", 40)
-                config_interest_type = selected_house_config_data.get("INTEREST_TYPE", "Variable")
-                
-                # Validate variable rates length
-                if len(config_variable_rates) != 6:
-                    st.warning("⚠️ Variable rates in config should have exactly 6 values. Using defaults.")
-                    config_variable_rates = DEFAULT_VARIABLE_RATES.copy()
+            # Validate variable rates length
+            if len(config_variable_rates) != 6:
+                st.warning("⚠️ Variable rates in config should have exactly 6 values. Using defaults.")
+                config_variable_rates = DEFAULT_VARIABLE_RATES.copy()
 
-    except FileNotFoundError:
-        st.warning("⚠️ config_house_interests.json not found.")
-    except json.JSONDecodeError:
-        st.error("❌ Invalid JSON in config_house_interests.json.")
-    except Exception as e:
-        st.error(f"❌ Error loading house configurations: {str(e)}")
-
-    # Load strategy configurations
+    # Load strategy configurations (inline)
     st.markdown("### 💰 Payment Strategy Presets")
-    try:
-        with open('config_strategy.json', 'r') as f:
-            strategy_configs_list = json.load(f)
+    
+    # Extract strategy config names for dropdown
+    strategy_config_names = ["None"] + [config.get("CONFIG_NAME", f"Strategy Config {i+1}") for i, config in enumerate(STRATEGY_CONFIGS)]
+    
+    # Strategy configuration selector
+    selected_strategy_config = st.selectbox(
+        "Choose payment strategy preset:",
+        options=strategy_config_names,
+        help="Select a predefined payment strategy configuration",
+        key="strategy_config"
+    )
+    
+    # Load selected strategy configuration
+    if selected_strategy_config != "None":
+        # Find the selected configuration
+        selected_strategy_config_data = None
+        for config in STRATEGY_CONFIGS:
+            if config.get("CONFIG_NAME") == selected_strategy_config:
+                selected_strategy_config_data = config
+                break
         
-        # Extract strategy config names for dropdown
-        strategy_config_names = ["None"] + [config.get("CONFIG_NAME", f"Strategy Config {i+1}") for i, config in enumerate(strategy_configs_list)]
-        
-        # Strategy configuration selector
-        selected_strategy_config = st.selectbox(
-            "Choose payment strategy preset:",
-            options=strategy_config_names,
-            help="Select a configuration from config_strategy.json",
-            key="strategy_config"
-        )
-        
-        # Load selected strategy configuration
-        if selected_strategy_config != "None":
-            # Find the selected configuration
-            selected_strategy_config_data = None
-            for config in strategy_configs_list:
-                if config.get("CONFIG_NAME") == selected_strategy_config:
-                    selected_strategy_config_data = config
-                    break
-            
-            if selected_strategy_config_data:
-                selected_strategy_config_name = selected_strategy_config
-                config_minimum_payment = selected_strategy_config_data.get("MINIMUM_PAYMENT", 0)
-                config_additional_amount = selected_strategy_config_data.get("ADDITIONAL_AMOUNT", 0)
-
-    except FileNotFoundError:
-        st.warning("⚠️ config_strategy.json not found.")
-    except json.JSONDecodeError:
-        st.error("❌ Invalid JSON in config_strategy.json.")
-    except Exception as e:
-        st.error(f"❌ Error loading strategy configurations: {str(e)}")
+        if selected_strategy_config_data:
+            selected_strategy_config_name = selected_strategy_config
+            config_minimum_payment = selected_strategy_config_data.get("MINIMUM_PAYMENT", 0)
+            config_additional_amount = selected_strategy_config_data.get("ADDITIONAL_AMOUNT", 0)
 
     # Show loaded configurations in compact format
     if selected_house_config_name != "None" or selected_strategy_config_name != "None":
