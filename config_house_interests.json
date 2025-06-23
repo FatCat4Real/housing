@@ -1,0 +1,26 @@
+[
+    {
+        "CONFIG_NAME": "Default House 4.3M",
+        "DEFAULT_HOUSE_PRICE": 4300000,
+        "LOAN_TERM": 40,
+        "INTEREST_TYPE": "Variable",
+        "DEFAULT_INTEREST_RATE": 4.0,
+        "DEFAULT_VARIABLE_RATES": [2.3, 2.9, 3.5, 4.495, 4.495, 5.495]
+    },
+    {
+        "CONFIG_NAME": "30-Year Variable",
+        "DEFAULT_HOUSE_PRICE": 4300000,
+        "LOAN_TERM": 30,
+        "INTEREST_TYPE": "Variable",
+        "DEFAULT_INTEREST_RATE": 4.0,
+        "DEFAULT_VARIABLE_RATES": [2.3, 2.9, 3.5, 4.495, 4.495, 5.495]
+    },
+    {
+        "CONFIG_NAME": "Low Interest 3.5M",
+        "DEFAULT_HOUSE_PRICE": 3500000,
+        "LOAN_TERM": 35,
+        "INTEREST_TYPE": "Fixed",
+        "DEFAULT_INTEREST_RATE": 3.5,
+        "DEFAULT_VARIABLE_RATES": [2.0, 2.5, 3.0, 3.8, 3.8, 4.5]
+    }
+] 

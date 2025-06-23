@@ -1,0 +1,17 @@
+[
+    {
+        "CONFIG_NAME": "No Extra Payment",
+        "MINIMUM_PAYMENT": 0,
+        "ADDITIONAL_AMOUNT": 0
+    },
+    {
+        "CONFIG_NAME": "20k a month",
+        "MINIMUM_PAYMENT": 15000,
+        "ADDITIONAL_AMOUNT": 5000
+    },
+    {
+        "CONFIG_NAME": "20k a month (v2)",
+        "MINIMUM_PAYMENT": 20000,
+        "ADDITIONAL_AMOUNT": 0
+    }
+] 

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import calendar
+import json
 
 # Page configuration
 st.set_page_config(
@@ -10,12 +11,7 @@ st.set_page_config(
 
 # Constants
 DEFAULT_HOUSE_PRICE = 4_300_000
-DEFAULT_DOWN_PAYMENT = 0
 DEFAULT_INTEREST_RATE = 4.0
-DEFAULT_MONTHLY_PAYMENT = 20_000
-DEFAULT_YEARLY_ADD_ON = 50_000
-DEFAULT_REFINANCE_CYCLE_YEARS = 0
-DEFAULT_RAISE_AFTER_REFINANCE = 0
 DEFAULT_START_YEAR = 2026
 DEFAULT_START_MONTH = 1
 DEFAULT_VARIABLE_RATES = [2.3, 2.9, 3.5, 4.495, 4.495, 5.495]
@@ -299,6 +295,26 @@ def render_summary_metrics(df, debt, baseline_df=None):
             
         interest_delta = f"-฿{interest_saved:,.0f}" if interest_saved > 0 else f"฿{abs(interest_saved):,.0f}"
 
+    # Calculate average payments for different periods
+    # Add relative year column for easier filtering
+    df_with_relative_year = df.copy()
+    df_with_relative_year['relative_year'] = df_with_relative_year['year'] - DEFAULT_START_YEAR + 1
+    
+    # Average payment calculations
+    avg_payment_total = df['total_payment'].mean()
+    
+    # Years 1-3
+    years_1_3 = df_with_relative_year[df_with_relative_year['relative_year'].between(1, 3)]
+    avg_payment_1_3 = years_1_3['total_payment'].mean() if len(years_1_3) > 0 else 0
+    
+    # Years 4-6
+    years_4_6 = df_with_relative_year[df_with_relative_year['relative_year'].between(4, 6)]
+    avg_payment_4_6 = years_4_6['total_payment'].mean() if len(years_4_6) > 0 else 0
+    
+    # Years 7+
+    years_7_plus = df_with_relative_year[df_with_relative_year['relative_year'] >= 7]
+    avg_payment_7_plus = years_7_plus['total_payment'].mean() if len(years_7_plus) > 0 else 0
+
     # Stack metrics in 2 rows of 2 for smaller, less crowded layout
     col1, col2, col3= st.columns((1, 1.2, 1.2))
     with col1:
@@ -307,6 +323,30 @@ def render_summary_metrics(df, debt, baseline_df=None):
         st.metric("💰 Total Interest", f"฿{total_interest:,.0f}", delta=interest_delta, border=True, delta_color='inverse')
     with col3:
         st.metric("💸 Total Paid", f"฿{total_paid:,.0f}", border=True)
+    
+    # Average payment metrics
+    # st.markdown("#### 📊 Average Monthly Payments")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.metric("📈 Full Lifecycle", f"฿{avg_payment_total:,.0f}", border=True)
+    with col2:
+        if avg_payment_1_3 > 0:
+            st.metric("🚀 Years 1-3", f"฿{avg_payment_1_3:,.0f}", border=True)
+        else:
+            st.metric("🚀 Years 1-3", "N/A", border=True)
+    
+    col3, col4 = st.columns(2)
+    with col3:
+        if avg_payment_4_6 > 0:
+            st.metric("⚡ Years 4-6", f"฿{avg_payment_4_6:,.0f}", border=True)
+        else:
+            st.metric("⚡ Years 4-6", "N/A", border=True)
+    with col4:
+        if avg_payment_7_plus > 0:
+            st.metric("🎯 Years 7+", f"฿{avg_payment_7_plus:,.0f}", border=True)
+        else:
+            st.metric("🎯 Years 7+", "N/A", border=True)
     
     return total_interest, total_principal
 
@@ -361,24 +401,7 @@ def render_visualizations(df, mode="simple"):
     
     st.dataframe(display_df.set_index('Date'), use_container_width=True, height=400)
 
-def render_property_info_form():
-    """Render property information form - shared component"""
-    # st.markdown("### 🏡 Property Information")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        house_price = st.number_input("🏠 Full House Price (฿)", value=DEFAULT_HOUSE_PRICE, step=100_000, format="%d")
-    with col2:
-        down = st.number_input("💰 Down Payment (฿)", value=DEFAULT_DOWN_PAYMENT, step=100_000, format="%d")
-    
-    debt = house_price - down
-    
-    # Display loan amount
-    # st.info(f"💳 **Loan Amount: ฿{debt:,.0f}**")
-    
-    return house_price, down, debt
-
-def render_top_up_section(key_prefix=""):
+def render_top_up_section(key_prefix="", default_minimum=0, default_additional=0):
     """Render top-up payment section - shared component"""
     # st.markdown("### 💰 Top Up Payment")
     
@@ -387,7 +410,7 @@ def render_top_up_section(key_prefix=""):
     with col1:
         minimum_payment = st.number_input(
             "💰 Minimum Payment (฿)", 
-            value=0, 
+            value=default_minimum, 
             step=1000, 
             format="%d", 
             help="Only used when higher than required payment. Payment = MAX(required_payment, minimum_payment)",
@@ -397,7 +420,7 @@ def render_top_up_section(key_prefix=""):
     with col2:
         additional_amount = st.number_input(
             "💰 Additional Amount (฿)", 
-            value=0, 
+            value=default_additional, 
             step=1000, 
             format="%d",
             help="Extra amount to add on top of the effective payment each month",
@@ -414,19 +437,146 @@ def render_top_up_section(key_prefix=""):
 # Main Application
 st.markdown("## 🏠 Mortgage Calculator")
 
-st.write('')
+# Initialize default values - these will be updated by sidebar configurations
+config_house_price = DEFAULT_HOUSE_PRICE
+config_interest_rate = DEFAULT_INTEREST_RATE
+config_variable_rates = DEFAULT_VARIABLE_RATES.copy()
+config_loan_term = 40
+config_interest_type = "Variable"
+config_minimum_payment = 0
+config_additional_amount = 0
+
+# Sidebar configurations - MUST BE BEFORE main content to update config values
+with st.sidebar:
+    st.markdown("## ⚙️ Configuration Presets")
+    
+    # Initialize variables for configuration loading
+    selected_house_config_name = "None"
+    selected_strategy_config_name = "None"
+    
+    # Load house/interest configurations
+    st.markdown("### 🏠 House & Interest Presets")
+    try:
+        with open('config_house_interests.json', 'r') as f:
+            house_configs_list = json.load(f)
+        
+        # Extract house config names for dropdown
+        house_config_names = ["None"] + [config.get("CONFIG_NAME", f"House Config {i+1}") for i, config in enumerate(house_configs_list)]
+        
+        # House configuration selector
+        selected_house_config = st.selectbox(
+            "Choose house & interest preset:",
+            options=house_config_names,
+            help="Select a configuration from config_house_interests.json",
+            key="house_config"
+        )
+        
+        # Load selected house configuration
+        if selected_house_config != "None":
+            # Find the selected configuration
+            selected_house_config_data = None
+            for config in house_configs_list:
+                if config.get("CONFIG_NAME") == selected_house_config:
+                    selected_house_config_data = config
+                    break
+            
+            if selected_house_config_data:
+                selected_house_config_name = selected_house_config
+                config_house_price = selected_house_config_data.get("DEFAULT_HOUSE_PRICE", DEFAULT_HOUSE_PRICE)
+                config_interest_rate = selected_house_config_data.get("DEFAULT_INTEREST_RATE", DEFAULT_INTEREST_RATE)
+                config_variable_rates = selected_house_config_data.get("DEFAULT_VARIABLE_RATES", DEFAULT_VARIABLE_RATES.copy())
+                config_loan_term = selected_house_config_data.get("LOAN_TERM", 40)
+                config_interest_type = selected_house_config_data.get("INTEREST_TYPE", "Variable")
+                
+                # Validate variable rates length
+                if len(config_variable_rates) != 6:
+                    st.warning("⚠️ Variable rates in config should have exactly 6 values. Using defaults.")
+                    config_variable_rates = DEFAULT_VARIABLE_RATES.copy()
+
+    except FileNotFoundError:
+        st.warning("⚠️ config_house_interests.json not found.")
+    except json.JSONDecodeError:
+        st.error("❌ Invalid JSON in config_house_interests.json.")
+    except Exception as e:
+        st.error(f"❌ Error loading house configurations: {str(e)}")
+
+    # Load strategy configurations
+    st.markdown("### 💰 Payment Strategy Presets")
+    try:
+        with open('config_strategy.json', 'r') as f:
+            strategy_configs_list = json.load(f)
+        
+        # Extract strategy config names for dropdown
+        strategy_config_names = ["None"] + [config.get("CONFIG_NAME", f"Strategy Config {i+1}") for i, config in enumerate(strategy_configs_list)]
+        
+        # Strategy configuration selector
+        selected_strategy_config = st.selectbox(
+            "Choose payment strategy preset:",
+            options=strategy_config_names,
+            help="Select a configuration from config_strategy.json",
+            key="strategy_config"
+        )
+        
+        # Load selected strategy configuration
+        if selected_strategy_config != "None":
+            # Find the selected configuration
+            selected_strategy_config_data = None
+            for config in strategy_configs_list:
+                if config.get("CONFIG_NAME") == selected_strategy_config:
+                    selected_strategy_config_data = config
+                    break
+            
+            if selected_strategy_config_data:
+                selected_strategy_config_name = selected_strategy_config
+                config_minimum_payment = selected_strategy_config_data.get("MINIMUM_PAYMENT", 0)
+                config_additional_amount = selected_strategy_config_data.get("ADDITIONAL_AMOUNT", 0)
+
+    except FileNotFoundError:
+        st.warning("⚠️ config_strategy.json not found.")
+    except json.JSONDecodeError:
+        st.error("❌ Invalid JSON in config_strategy.json.")
+    except Exception as e:
+        st.error(f"❌ Error loading strategy configurations: {str(e)}")
+
+    # Show loaded configurations in compact format
+    if selected_house_config_name != "None" or selected_strategy_config_name != "None":
+        st.markdown("### 📋 Active Configurations")
+        if selected_house_config_name != "None":
+            st.success(f"🏠 **House:** {selected_house_config_name}")
+        
+        if selected_strategy_config_name != "None":
+            st.success(f"💰 **Strategy:** {selected_strategy_config_name}")
+    
+    st.markdown("---")
+    
+    # How it works section
+    st.markdown("""
+    ### ℹ️ How This Calculator Works
+    
+    **Standard Formula**: Uses the traditional mortgage payment formula: 
+    
+    `M = P × [r(1+r)^n] / [(1+r)^n - 1]`
+    
+    Where:
+    - M = Monthly payment
+    - P = Principal loan amount  
+    - r = Monthly interest rate
+    - n = Number of payments
+    
+    **Monthly Recalculation**: For variable rates, payments are recalculated each year.
+    
+    **Top-up Options**: Add extra payments to reduce loan term.
+    """)
+
+# st.write('')
 # Property Information
-# house_price, down, debt = render_property_info_form()
 
 # st.markdown("---")
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    house_price = st.number_input("Loan Amount (฿)", value=DEFAULT_HOUSE_PRICE, step=100_000, format="%d")
-# with col2:
-    # down = st.number_input("💰 Down Payment (฿)", value=DEFAULT_DOWN_PAYMENT, step=100_000, format="%d")
+    house_price = st.number_input("Loan Amount (฿)", value=config_house_price, step=100_000, format="%d")
 
-# debt = house_price - down
 debt = house_price
 
 # Loan Term and Interest Configuration
@@ -434,7 +584,7 @@ debt = house_price
 with col2:
     loan_years = st.number_input(
         "Loan Term (Years)", 
-        value=40, 
+        value=config_loan_term, 
         min_value=1, 
         max_value=50, 
         step=1,
@@ -442,10 +592,12 @@ with col2:
     )
 with col3:
     # Choose between fixed or variable rate
+    rate_type_options = ["Variable", "Fixed"]
+    default_index = rate_type_options.index(config_interest_type) if config_interest_type in rate_type_options else 0
     rate_type = st.radio(
         "Interest Rate Type:", 
-        # ["Fixed Rate", "Variable Rates (6 periods)"],
-        ["Variable", "Fixed"],
+        options=rate_type_options,
+        index=default_index,
         help="Choose between a single fixed rate or variable rates for different periods",
         horizontal=True
     )
@@ -455,7 +607,7 @@ if rate_type == "Fixed":
     # st.markdown("### Interest Rate")
     interest = st.number_input(
         "Interest Rate (%)", 
-        value=DEFAULT_INTEREST_RATE, 
+        value=config_interest_rate, 
         step=0.1, 
         format="%.1f",
         help="Annual interest rate for the entire loan term"
@@ -468,7 +620,7 @@ if rate_type == "Fixed":
         # st.info(f"**Calculated Monthly Payment: ฿{calculated_payment:,.2f}**")
     
     # Top up payment strategies
-    top_up_params = render_top_up_section(key_prefix="topup")
+    top_up_params = render_top_up_section(key_prefix="topup", default_minimum=config_minimum_payment, default_additional=config_additional_amount)
     
     yearly_add_on = 0  # No additional payments for standard mortgage
 
@@ -518,17 +670,17 @@ else:
     # Collect 6 interest rates
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     with col1:
-        rate1 = st.number_input("Year 1 (%)", value=DEFAULT_VARIABLE_RATES[0], step=0.001, format="%.3f", key="std_rate_1")
+        rate1 = st.number_input("Year 1 (%)", value=config_variable_rates[0], step=0.001, format="%.3f", key="std_rate_1")
     with col2:
-        rate2 = st.number_input("Year 2 (%)", value=DEFAULT_VARIABLE_RATES[1], step=0.001, format="%.3f", key="std_rate_2")
+        rate2 = st.number_input("Year 2 (%)", value=config_variable_rates[1], step=0.001, format="%.3f", key="std_rate_2")
     with col3:
-        rate3 = st.number_input("Year 3 (%)", value=DEFAULT_VARIABLE_RATES[2], step=0.001, format="%.3f", key="std_rate_3")
+        rate3 = st.number_input("Year 3 (%)", value=config_variable_rates[2], step=0.001, format="%.3f", key="std_rate_3")
     with col4:
-        rate4 = st.number_input("Year 4 (%)", value=DEFAULT_VARIABLE_RATES[3], step=0.001, format="%.3f", key="std_rate_4")
+        rate4 = st.number_input("Year 4 (%)", value=config_variable_rates[3], step=0.001, format="%.3f", key="std_rate_4")
     with col5:
-        rate5 = st.number_input("Year 5 (%)", value=DEFAULT_VARIABLE_RATES[4], step=0.001, format="%.3f", key="std_rate_5")
+        rate5 = st.number_input("Year 5 (%)", value=config_variable_rates[4], step=0.001, format="%.3f", key="std_rate_5")
     with col6:
-        rate6 = st.number_input("Year 6+ (%)", value=DEFAULT_VARIABLE_RATES[5], step=0.001, format="%.3f", key="std_rate_6")
+        rate6 = st.number_input("Year 6+ (%)", value=config_variable_rates[5], step=0.001, format="%.3f", key="std_rate_6")
     
     rates = [rate1/100, rate2/100, rate3/100, rate4/100, rate5/100, rate6/100]
     
@@ -538,7 +690,7 @@ else:
         # st.info(f"**Initial Monthly Payment (Year 1): ฿{initial_payment:,.2f}** (Payment will be recalculated each year)")
     
     # Top up payment strategies
-    top_up_params = render_top_up_section(key_prefix="topup")
+    top_up_params = render_top_up_section(key_prefix="topup", default_minimum=config_minimum_payment, default_additional=config_additional_amount)
     
     yearly_add_on = 0  # No additional payments for standard mortgage
 
@@ -581,24 +733,3 @@ else:
     else:
         st.warning("Please enter a house price greater than your down payment to see calculations.")
 
-# Sidebar information
-with st.sidebar:
-    st.markdown("""
-    ### How This Calculator Works
-    
-    **Standard Formula**: Uses the traditional mortgage payment formula: 
-    
-    `M = P × [r(1+r)^n] / [(1+r)^n - 1]`
-    
-    Where:
-    - M = Monthly payment
-    - P = Principal loan amount
-    - r = Monthly interest rate
-    - n = Number of payments
-    
-    **Monthly Recalculation**: For variable rates, payments are recalculated each year.
-    
-    **Top-up Options**: Add extra payments to reduce loan term.
-    
-    ---
-    """)
